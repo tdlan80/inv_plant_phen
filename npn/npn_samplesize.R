@@ -70,6 +70,11 @@ sms_ecor1 = rbind.data.frame(sms_ecor1, sms_ecor1_e) %>% group_by(sciName, year,
 
 write_csv(sms_ecor1, file="C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/NofRecords_bySppYearEcor1.csv")
 
+sms_ecor1a = sms_ecor1 %>% group_by(sciName, NA_L1CODE) %>% summarise(n_ecor1=sum(n_ecor1))
+
+write_csv(sms_ecor1a, file="C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/NofRecords_bySppEcor1.csv")
+
+
 
 # calculate sample size for each species in each year in each Level 2 ecoregion
 sms_ecor2 <- foreach(i=year, .combine = rbind) %do% 
