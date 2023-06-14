@@ -91,6 +91,7 @@ write_csv(npn_ecor_all,
 
 # select location-year columns
 npn_ecor_sy=npn_ecor_all %>% select(4:9,52:58) %>% distinct()
+npn_ecor_sy=npn_ecor_sy %>% arrange(year, siteId)
 
 write_csv(npn_ecor_sy, 
           file= paste0("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_2009_2021_ecor_siteyear.csv", sep=""))
