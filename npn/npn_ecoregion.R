@@ -60,3 +60,37 @@ npn_noecor <- foreach(i=year, .combine = rbind) %do%
 # export to one csv file
 write_csv(npn_noecor, 
           file= paste0("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_2009_2021_NOecor.csv", sep=""))
+
+
+# combine data with ecoregion for all years
+npn_ecor <- foreach(i=year, .combine = rbind) %do%
+  {
+    read_csv(paste0("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN", i, "ecor.csv", sep=""))
+  }
+
+# read data with manually assigned ecoregion
+npn_noecor=read_csv("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_2009_2021_NOecor_ed.csv")
+summary(npn_noecor)
+unique(npn_noecor$NA_L2CODE)
+
+ecor = ecoregion3 %>% st_drop_geometry() %>% select(1:4) %>% distinct()
+
+npn_noecor1=npn_noecor %>% select(-NA_L2CODE, -NA_L3CODE)
+npn_noecor1=left_join(npn_noecor1, ecor)
+summary(npn_noecor1)
+unique(npn_noecor1$NA_L2CODE)
+
+# combine data with ecoregion and data with manually-assigned ecoregion
+npn_ecor_all=rbind.data.frame(npn_ecor, npn_noecor1)
+
+# assign -9999 to NA
+npn_ecor_all[npn_ecor_all==-9999]=NA
+
+write_csv(npn_ecor_all, 
+          file= paste0("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_2009_2021_ecor_all.csv", sep=""))
+
+# select location-year columns
+npn_ecor_sy=npn_ecor_all %>% select(4:9,52:58) %>% distinct()
+
+write_csv(npn_ecor_sy, 
+          file= paste0("C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_2009_2021_ecor_siteyear.csv", sep=""))
