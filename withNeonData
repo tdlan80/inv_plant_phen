@@ -1,0 +1,715 @@
+
+# accessing NPN status data from rnpn
+# for eastern US
+
+setwd('C:/Users/tsurasinghe/OneDrive - Bridgewater State University/Research2019/invasiveNPN')
+
+
+library(readr)
+library(readxl)
+library(magrittr)
+library(tidyverse)
+library(tibble)
+library(janitor)
+library(rnpn)
+library(googledrive)
+library(googlesheets4)
+library(data.table)
+library(writexl)
+# library(vroom)
+library(neonUtilities)
+library(neonOS)
+library(stringr)
+library(stringi)
+library(forcats)
+library(pivottabler)
+library(openxlsx)
+
+load("eastUS0921_P1_CSV.RData")
+load("eastUS0921_P2_CSV.RData")
+load("eastUS0921_P3_CSV.RData")
+load("eastUS0921_CSV.RData")
+load("plantsNPNdata.RData")
+load("allplants.RData")
+load("allPhenophases.RData")
+# Load("allNPNdata.RData")
+load("allNPNdata.RData")
+load("phenotables.RData" )
+load("plantsNPNdata2.RData")
+load("webPlantsNPN.RData")
+load("allPhenophases.RData")
+load("PLANTShabit.RData")
+load("PLANTSduration.RData")
+load("byYearPlantsNPN.RData")
+load("plantsNPNdata3.RData")
+load("PLANTSdurationHabit.RData")
+load("USDAplantsNPNdata1.RData")
+load("USDAplantsNPNdata2.RData")
+load("NPNGrowth&Duration.RData")
+load("NPNGrowthDuration.RData")
+load("PlantsDurationHabitPivot.RData")
+load("USDAplantsNPNdata1.RData")
+load("USDAplantsNPNdata2.RData")
+load("USDAplantsNPNPivotSymbol.RData")
+load("NEONplants.RData")
+load("byYrSppEcor.RData")
+load("plantsTaxTab.RData")
+load("neonPlantDiv.RData")
+load("nOfRec_bySppYrEcor1Nativity2.RData")
+load("nativityList.RData")
+load("nOfRec_bySppYrEcor2Nativity2.RData")
+load("NofRecords_bySppYearEcor5&8.RData")
+load("nOfRec_bySppYrEcor1Nativity.RData")
+load("neonPlantList.RData")
+
+
+rm(list = ls())
+.rs.restartR()
+
+
+# Create destination data folder (if there isn't one)
+if(!dir.exists('ecoreg')) dir.create('ecoreg')
+
+# online resources
+# plant functional types
+browseURL("https://docs.google.com/document/d/1eavZ5UzZxiRmfxlmA6t023Z1UD1ggzPbjxBBjPynB0E/pub")
+
+# API/webservice documentation 
+browseURL("https://docs.google.com/document/d/1yNjupricKOAXn6tY1sI7-EwkcfwdGUZ7lxYv7fcPjO8/edit")
+
+# rnpn vignette
+browseURL("https://github.com/usa-npn/rnpn")
+
+# npn documentation
+browseURL("https://pubs.usgs.gov/of/2017/1003/ofr20171003.pdf")
+browseURL("https://pubs.usgs.gov/of/2018/1060/ofr20181060.pdf")
+
+# # Download the shapefiles for all ecoregions, level I, II, III.
+
+# default time out is too short
+options(timeout = max(3000, getOption("timeout")))
+
+download.file(url = "https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/cec_na/na_cec_eco_l1.zip", 
+              destfile = "C:/Users/tsurasinghe/OneDrive - Bridgewater State University/Research2019/invasiveNPN/ecoreg/level1.zip", 
+              method = "auto", quiet = FALSE, mode = "wb", # for comrpessed files
+              cacheOK = TRUE, # Is a server-side cached value acceptable?
+              )
+
+download.file(url = "https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/cec_na/na_cec_eco_l2.zip", 
+              destfile = "C:/Users/tsurasinghe/OneDrive - Bridgewater State University/Research2019/invasiveNPN/ecoreg/level2.zip", 
+              method = "auto", quiet = FALSE, mode = "wb", # for comrpessed files
+              cacheOK = TRUE, # Is a server-side cached value acceptable?
+)
+
+download.file(url = "https://gaftp.epa.gov/EPADataCommons/ORD/Ecoregions/cec_na/NA_CEC_Eco_Level3.zip", 
+              destfile = "C:/Users/tsurasinghe/OneDrive - Bridgewater State University/Research2019/invasiveNPN/ecoreg/level3.zip", 
+              method = "auto", quiet = FALSE, mode = "wb", # for comrpessed files
+              cacheOK = TRUE, # Is a server-side cached value acceptable?
+)
+
+
+# Unzip all folders using unzip 
+unzip(zipfile = "ecoreg/level1.zip", #pathname of the zip file with tilde expansion
+      files = NULL, # a character vector of recorded filepaths to be extracted: the default (NULL) extracts all files.
+      list = FALSE, # If TRUE, list the files and extract none. 
+      overwrite = TRUE, junkpaths = FALSE, exdir = "ecoreg", # wxtraction dir
+      unzip = "internal", setTimes = FALSE)
+
+unzip(zipfile = "ecoreg/level2.zip", #pathname of the zip file with tilde expansion
+      files = NULL, # a character vector of recorded filepaths to be extracted: the default (NULL) extracts all files.
+      list = FALSE, # If TRUE, list the files and extract none. 
+      overwrite = TRUE, junkpaths = FALSE, exdir = "ecoreg", # wxtraction dir
+      unzip = "internal", setTimes = FALSE)
+
+unzip(zipfile = "ecoreg/level3.zip", #pathname of the zip file with tilde expansion
+      files = NULL, # a character vector of recorded filepaths to be extracted: the default (NULL) extracts all files.
+      list = FALSE, # If TRUE, list the files and extract none. 
+      overwrite = TRUE, junkpaths = FALSE, exdir = "ecoreg", # wxtraction dir
+      unzip = "internal", setTimes = FALSE)
+
+# The Status and Intensity data type is the most direct presentation of the unprocessed phenology data 
+# Each row is comprised of a single record of the status (1/present/“Yes”, 0/absent/“No” or -1/uncertain/“?”) or intensity
+# of a single phenophase on an individual plant or species of animal at a site on a single site visit, 
+# AND the estimated intensity or abundance (e.g., percent canopy fullness)
+
+# accessing data as a CSV
+# without functional_types or species_types defined
+# with additional fields included
+# since we are pipelineing too much data so need to break it down into smaller chunks 
+# split into multiple different years and re-run the same code
+# i think the default for most args is NULL
+eastUS0921_P1 <-
+  npn_download_status_data(
+    request_source = "ERENbiodiversity", # who is requesting data
+    years = c(2009:2013),
+    coords = c ( lower_left_lat = 24.10487, lower_left_long = -95.1356, upper_right_lat = 48.73317, upper_right_long = -61.56138),
+    species_ids = NULL, genus_ids = NULL, family_ids = NULL, order_ids = NULL,class_ids = NULL, station_ids = NULL,
+    species_types = NULL, network_ids = NULL,
+    phenophase_ids = NULL,
+    functional_types = NULL,
+    additional_fields = c("dataset_id", "site_name", "species_functional_type", "species_category", "usda_plants_symbol", 
+                          "phenophase_category", "phenophase_name"),
+    climate_data = 1,
+    ip_address = NULL,
+    dataset_ids = NULL,
+    email = "tsurasinghe@bridgew.edu",
+    download_path = "eastUS0921_P1.csv",
+    six_leaf_layer = FALSE,
+    six_bloom_layer = FALSE,
+    agdd_layer = NULL,
+    six_sub_model = NULL,
+    additional_layers = NULL,
+    pheno_class_ids = NULL,
+    wkt = NULL
+  )
+
+
+eastUS0921_P2 <-
+  npn_download_status_data(
+    request_source = "ERENbiodiversity", # who is requesting data
+    years = c(2014:2017),
+    coords = c ( lower_left_lat = 24.10487, lower_left_long = -95.1356, upper_right_lat = 48.73317, upper_right_long = -61.56138),
+    species_ids = NULL, genus_ids = NULL, family_ids = NULL, order_ids = NULL,class_ids = NULL, station_ids = NULL,
+    species_types = NULL, network_ids = NULL,
+    phenophase_ids = NULL,
+    functional_types = NULL,
+    additional_fields = c("dataset_id", "site_name", "species_functional_type", "species_category", "usda_plants_symbol", 
+                          "phenophase_category", "phenophase_name"),
+    climate_data = 1,
+    ip_address = NULL,
+    dataset_ids = NULL,
+    email = "tsurasinghe@bridgew.edu",
+    download_path = "eastUS0921_P2.csv",
+    six_leaf_layer = FALSE,
+    six_bloom_layer = FALSE,
+    agdd_layer = NULL,
+    six_sub_model = NULL,
+    additional_layers = NULL,
+    pheno_class_ids = NULL,
+    wkt = NULL
+  )
+
+eastUS0921_P3 <-
+  npn_download_status_data(
+    request_source = "ERENbiodiversity", # who is requesting data
+    years = c(2018:2021),
+    coords = c ( lower_left_lat = 24.10487, lower_left_long = -95.1356, upper_right_lat = 48.73317, upper_right_long = -61.56138),
+    species_ids = NULL, genus_ids = NULL, family_ids = NULL, order_ids = NULL,class_ids = NULL, station_ids = NULL,
+    species_types = NULL, network_ids = NULL,
+    phenophase_ids = NULL,
+    functional_types = NULL,
+    additional_fields = c("dataset_id", "site_name", "species_functional_type", "species_category", "usda_plants_symbol", 
+                          "phenophase_category", "phenophase_name"),
+    climate_data = 1,
+    ip_address = NULL,
+    dataset_ids = NULL,
+    email = "tsurasinghe@bridgew.edu",
+    download_path = "eastUS0921_P3.csv",
+    six_leaf_layer = FALSE,
+    six_bloom_layer = FALSE,
+    agdd_layer = NULL,
+    six_sub_model = NULL,
+    additional_layers = NULL,
+    pheno_class_ids = NULL,
+    wkt = NULL
+  )
+
+
+# read back the CSV since the original vector is temp
+eastUS0921_P1_CSV <- read_csv(file = "eastUS0921_P1.csv", col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  
+                              name_repair = "unique", skip_empty_rows = TRUE)
+save(eastUS0921_P1_CSV, file = "eastUS0921_P1_CSV.RData")
+
+
+eastUS0921_P2_CSV <- read_csv(file = "eastUS0921_P2.csv", col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  
+                              name_repair = "unique", skip_empty_rows = TRUE)
+save(eastUS0921_P2_CSV, file = "eastUS0921_P2_CSV.RData")
+
+
+eastUS0921_P3_CSV <- read_csv(file = "eastUS0921_P3.csv", col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  
+                              name_repair = "unique", skip_empty_rows = TRUE)
+save(eastUS0921_P3_CSV, file = "eastUS0921_P3_CSV.RData")
+
+
+# bind the data sets together
+allNPNdata = rbindlist(list(eastUS0921_P1_CSV, eastUS0921_P2_CSV, eastUS0921_P3_CSV))
+save(allNPNdata, file = "allNPNdata.RData")
+
+
+
+# filter plant data only
+plantsNPNdata2 =  allNPNdata %>% dplyr::filter(kingdom == "Plantae") %>% 
+  unite(col= "sciName", c("genus", "species"), sep = " " , remove = F) %>% # make scientific names col
+  mutate(invasive = str_detect(string = species_category, pattern = "Invasive", negate = F ) ) %>%  # ID invasive species
+  mutate(year = lubridate::year(observation_date) ) # year extracted 
+
+save(plantsNPNdata2, file = "plantsNPNdata2.RData")
+
+# save the cleaned plants-only NPN dataset as a csv
+readr::write_csv(x = plantsNPNdata2, file = "plantsNPNdataCSV.csv", append = FALSE, col_names = T)
+
+# change the colnames
+plantsNPNdata3 = plantsNPNdata2 %>% 
+  janitor::clean_names(case = "lower_camel") %>% 
+  dplyr::rename(genusName = genus, speciesEpithet = species)
+  
+
+save(plantsNPNdata3, file = "plantsNPNdata3.RData")
+
+# for easy handling, break the plantsNPNdata2 dataset into smaller parts by filtering by year
+plantsNPN2009 <- plantsNPNdata3 %>% dplyr::filter(year == 2009)
+plantsNPN2010 <- plantsNPNdata3 %>% dplyr::filter(year == 2010)
+plantsNPN2011 <- plantsNPNdata3 %>% dplyr::filter(year == 2011)
+plantsNPN2012 <- plantsNPNdata3 %>% dplyr::filter(year == 2012)
+plantsNPN2013 <- plantsNPNdata3 %>% dplyr::filter(year == 2013)
+plantsNPN2014 <- plantsNPNdata3 %>% dplyr::filter(year == 2014)
+plantsNPN2015 <- plantsNPNdata3 %>% dplyr::filter(year == 2015)
+plantsNPN2016 <- plantsNPNdata3 %>% dplyr::filter(year == 2016)
+plantsNPN2017 <- plantsNPNdata3 %>% dplyr::filter(year == 2017)
+plantsNPN2018 <- plantsNPNdata3 %>% dplyr::filter(year == 2018)
+plantsNPN2019 <- plantsNPNdata3 %>% dplyr::filter(year == 2019)
+plantsNPN2020 <- plantsNPNdata3 %>% dplyr::filter(year == 2020)
+plantsNPN2021 <- plantsNPNdata3 %>% dplyr::filter(year == 2021)
+
+save(plantsNPN2009, plantsNPN2010, plantsNPN2011, plantsNPN2012, plantsNPN2013, plantsNPN2014, plantsNPN2015, plantsNPN2016,
+     plantsNPN2017, plantsNPN2018, plantsNPN2019, plantsNPN2020, plantsNPN2021, file = "byYearPlantsNPN.RData")
+
+
+readr::write_csv(x = plantsNPN2009, file = "plantsNPN2009.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2010, file = "plantsNPN2010.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2011, file = "plantsNPN2011.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2012, file = "plantsNPN2012.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2013, file = "plantsNPN2013.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2014, file = "plantsNPN2014.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2015, file = "plantsNPN2015.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2016, file = "plantsNPN2016.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2017, file = "plantsNPN2017.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2018, file = "plantsNPN2018.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2019, file = "plantsNPN2019.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2020, file = "plantsNPN2020.csv", append = FALSE, col_names = T)
+readr::write_csv(x = plantsNPN2021, file = "plantsNPN2021.csv", append = FALSE, col_names = T)
+
+  
+# how many species
+plantsNPNdata$common_name %>% as.factor() %>% nlevels() 
+plantsNPNdata$species_id %>% as.factor() %>% nlevels()
+plantsNPNdata2$sciName %>% as.factor() %>% nlevels() # 777 species 
+
+# how many records of invasive vs native species in the datatset?
+plantsNPNdata2 %>% 
+  group_by(invasive) %>% 
+  dplyr::summarise('no of records' = n() )
+#  
+# invasive `no of records`
+# <lgl>              <int>
+# 1 not invasive        12227203
+# 2 invasive              754717 
+
+# how many species per invasive vs native in the datatset?
+plantsNPNdata2 %>% 
+  group_by(invasive) %>% 
+  dplyr::summarise('no of species' = n_distinct(sciName) )
+#  
+# A tibble: 2 × 2
+# invasive `no of species`
+# <lgl>              <int>
+# 1 FALSE              694
+# 2 TRUE                  83
+
+# how many records per both native and invasive species
+perSpeciesRecrds = plantsNPNdata2 %>% 
+  group_by(invasive, sciName) %>% 
+  dplyr::summarise('no of records' = n() )
+
+# for each year, how many native vs invasive species
+perSpeciesYearRecrds = plantsNPNdata2 %>% 
+  group_by(invasive, year, sciName) %>% 
+  dplyr::summarise('no of records' = n() )
+
+# how many different phenophase types were observed per species
+perSpeciesPhenophaseRecrds = plantsNPNdata2 %>% 
+  group_by(invasive, sciName, phenophase_category) %>% 
+  dplyr::summarise('no of records' = n() )
+
+# site_ID, year
+# how many records per site, year, per species, per phenophase category
+# switch the order-- species, sites, in which years
+perSiteYrSpeciesPhenoRecrds = plantsNPNdata2 %>% 
+  group_by(site_id, year, invasive, sciName, phenophase_category) %>% 
+  dplyr::summarise('no of records' = n() )
+
+# save above objects as xl files 
+write_xlsx(x = perSpeciesRecrds, path = "perSpeciesRecrds.xlsx", col_names = TRUE, format_headers = TRUE)
+write_xlsx(x = perSpeciesYearRecrds, path = "perSpeciesYearRecrds.xlsx", col_names = TRUE, format_headers = TRUE)
+write_xlsx(x = perSpeciesPhenophaseRecrds, path = "perSpeciesPhenophaseRecrds.xlsx", col_names = TRUE, format_headers = TRUE)
+write_xlsx(x = perSiteYrSpeciesPhenoRecrds, path = "perSiteYrSpeciesPhenoRecrds.xlsx", col_names = TRUE, format_headers = TRUE)
+
+save(perSpeciesRecrds, perSpeciesYearRecrds, perSpeciesPhenophaseRecrds, file ="phenotables.RData" )
+
+# look at all the plant species at NPN, this will contain a functional_type category
+allplants <- npn_species(kingdom = "Plantae", start_date = "01-01-2009", end_date = "12-31-2021" )
+save(allplants, file = "allplants.RData")
+
+# look at all the plant phenophases at NPN
+allPhenophases <- npn_phenophases(kingdom = "Plantae" )
+save(allPhenophases, file = "allPhenophases.RData")
+
+# check out the data from the web portal
+# should be the same as those coming from the API
+
+# did not work
+# eastUS <- read_csv(file = "webPortalData/datasheet_1669510180895/status_intensity_observation_data.csv", 
+#                    col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  name_repair = "unique", skip_empty_rows = TRUE)
+# # did not work
+# eastUS <- vroom(file = "webPortalData/datasheet_1669510180895/status_intensity_observation_data.csv",
+#                 delim = NULL,  col_names = TRUE, col_select = NULL,
+#                 id = NULL, skip = 0, n_max = Inf,  skip_empty_rows = TRUE,
+#                 trim_ws = TRUE, .name_repair = "unique")
+
+# worked
+webPlantsNPN2 <- fread(file = "webPortalData/datasheet_1669510180895/status_intensity_observation_data.csv", 
+                       sep="auto", sep2="auto", # auto-detect the separator 
+                       dec=".", nrows=Inf, header= T,
+                       na.strings=getOption("datatable.na.strings","NA"),  # character vector of strings which are to be interpreted as NA values
+                       stringsAsFactors=FALSE, skip= 0, select=NULL, drop=NULL, colClasses=NULL,
+                       check.names=T, # names of the variables in the data.table are checked to ensure that they are syntactically valid variable names. 
+                       strip.white=TRUE, fill=T, # If TRUE, in case  rows have unequal length, blank fields are implicitly filled. 
+                       blank.lines.skip=FALSE, #  If TRUE blank lines in the input are ignored.
+                       data.table=getOption("datatable.fread.datatable", TRUE), # TRUE returns a data.table. FALSE returns a data.frame. 
+                       logical01=getOption("datatable.logical01", FALSE),  # If TRUE a column containing only 0s and 1s will be read as logical, otherwise as integer.
+                       keepLeadingZeros = getOption("datatable.keepLeadingZeros", FALSE), # If TRUE a column containing numeric data with leading zeros will be read as character, 
+)
+save(webPlantsNPN2, file = "webPlantsNPN2.RData")
+
+# this one worked as well
+webPlantsNPN = read.csv(file = "webPortalData/datasheet_1669510180895/status_intensity_observation_data.csv", header = TRUE, sep = ",", quote = "\"",
+                        dec = ".", fill = TRUE)
+save(webPlantsNPN, file = "webPlantsNPN.RData")
+
+# read USDA's PLANTS database, both growth habits and the duration
+PLANTSduration <- read_csv(file = "USDAplants/PLANTSduration.csv", col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  
+                              name_repair = "unique", skip_empty_rows = TRUE) %>% 
+  janitor::clean_names(case = "lower_camel") %>% 
+  # remove longer parts of the scientific name
+  dplyr::mutate(scientificName2 = stringr::word( string = scientificName, start = 1, end = 2, sep = fixed(" "))) %>% # sep: seperator between words
+  dplyr::select(-genusName, -speciesName, -commonName, -synonymSymbol) # these cols can be redundant with the NPN database
+  
+ 
+PLANTShabit <- read_csv(file = "USDAplants/PLANTSgrowthhabit.csv", col_names = TRUE, trim_ws = TRUE, skip = 0, n_max = Inf,  
+                           name_repair = "unique", skip_empty_rows = TRUE) %>% 
+  janitor::clean_names(case = "lower_camel")  %>% 
+  dplyr::mutate(scientificName2 = stringr::word( string = scientificName, start = 1, end = 2, sep = fixed(" ")))%>% 
+  dplyr::select(-genusName, -speciesName, -commonName, -synonymSymbol)
+
+
+save(PLANTShabit, file = "PLANTShabit.RData")
+save(PLANTSduration, file = "PLANTSduration.RData")
+
+# join the habit with duration
+PLANTSdurationHabit  <-
+  dplyr::left_join(PLANTShabit, PLANTSduration, by = c ("acceptedSymbol", "smpName", "scientificName2"))
+
+save(PLANTSdurationHabit, file = "PLANTSdurationHabit.RData")
+
+# pivot each USDA PLANTS datasets first
+PLANTSdurationPivot <- PLANTSduration %>% 
+  dplyr::select(-scientificName) %>% 
+  distinct() %>% 
+  tidyr::pivot_wider(names_from = duration, 
+                                           names_repair = "unique", 
+                                           values_from = duration, values_fill = NA )
+  
+PLANTShabitPivot <- PLANTShabit %>% 
+  dplyr::select(-scientificName) %>% 
+  distinct() %>% 
+  mutate(growthHabit = dplyr::recode(growthHabit, "Forb/herb" = "forbHerb"  ) ) %>% 
+  tidyr::pivot_wider(names_from = growthHabit, 
+                     names_repair = "unique", 
+                     values_from = growthHabit, values_fill = NA )
+
+
+# now join them together
+PLANTShabitDurationPivot <- left_join(PLANTShabitPivot, PLANTSdurationPivot)
+
+save(PLANTShabitPivot, PLANTSdurationPivot, PLANTShabitDurationPivot,
+     file = "PlantsDurationHabitPivot.RData")
+
+
+# write the joint PLANTS dataset
+write_xlsx(x = PLANTSdurationHabit, path = "PLANTSdurationHabit.xlsx", col_names = TRUE, 
+           format_headers = TRUE)
+
+write_xlsx(x = PLANTShabitDurationPivot, path = "PLANTShabitDurationPivot.xlsx", col_names = TRUE, 
+           format_headers = TRUE)
+
+
+
+# join based on USDA plants symbol only
+USDAplantsNPNPivotSymbol <- plantsNPNdata3 %>%  
+  left_join(PLANTShabitDurationPivot, by = c("usdaPlantsSymbol" = "acceptedSymbol")) %>% 
+  tibble::rowid_to_column(var = "uniqueRowid") 
+
+save(USDAplantsNPNdata1, file = "USDAplantsNPNdata1.RData")
+save(USDAplantsNPNdata2, file = "USDAplantsNPNdata2.RData")
+save(USDAplantsNPNPivotSymbol, file = "USDAplantsNPNPivotSymbol.RData")
+
+
+readr::write_csv(x = USDAplantsNPNdata1, file = "USDAplantsNPNdata1.csv", append = FALSE, 
+                 col_names = T)
+readr::write_csv(x = USDAplantsNPNdata2, file = "USDAplantsNPNdata2.csv", append = FALSE, 
+                 col_names = T)
+
+readr::write_csv(x = USDAplantsNPNPivotSymbol, file = "USDAplantsNPNPivotSymbol.csv", 
+                 append = FALSE, 
+                 col_names = T)
+
+  
+# join NPN data with the USDA PLANTS database
+# join just based on the USDA plants symbol and scientific names
+ USDAplantsNPNdata1 <- plantsNPNdata3 %>%  
+    left_join(PLANTSdurationHabit, by = c("usdaPlantsSymbol" = "acceptedSymbol", 
+                                          "sciName" =  "scientificName2")) %>% 
+  tibble::rowid_to_column(var = "uniqueRowid") %>%  # add a unique rowID
+  mutate(growthHabit = recode(growthHabit, "Forb/herb" = "forbHerb"  ) )
+
+
+ USDAplantsNPNPivotSymbolSciName <- plantsNPNdata3 %>%  
+  left_join(PLANTShabitDurationPivot, by = c("usdaPlantsSymbol" = "acceptedSymbol", 
+                                        "sciName" =  "scientificName2")) %>% 
+  tibble::rowid_to_column(var = "uniqueRowid")   # add a unique rowID
+ 
+
+  
+# join based on USDA plants symbol only
+USDAplantsNPNdata2 <- plantsNPNdata3 %>%  
+  left_join(PLANTSdurationHabit, by = c("usdaPlantsSymbol" = "acceptedSymbol")) %>% 
+  tibble::rowid_to_column(var = "uniqueRowid") %>%  # add a unique rowID
+mutate(growthHabit = dplyr::recode(growthHabit, "Forb/herb" = "forbHerb"  ) )
+  
+save(USDAplantsNPNdata1, file = "USDAplantsNPNdata1.RData")
+save(USDAplantsNPNdata2, file = "USDAplantsNPNdata2.RData")
+
+save(USDAplantsNPNPivotSymbolSciName, file = "USDAplantsNPNPivotSymbolSciName.RData")
+
+readr::write_csv(x = USDAplantsNPNdata1, file = "USDAplantsNPNdata1.csv", append = FALSE, col_names = T)
+readr::write_csv(x = USDAplantsNPNdata2, file = "USDAplantsNPNdata2.csv", append = FALSE, col_names = T)
+
+readr::write_csv(x = USDAplantsNPNPivotSymbolSciName, 
+                 file = "USDAplantsNPNPivotSymbolSciName.csv", 
+                 append = FALSE, col_names = T)
+
+
+NPNGrowth <- USDAplantsNPNdata1 %>%
+  dplyr::select(-duration) %>% 
+  tidyr::pivot_wider(names_from = growthHabit, names_repair = "unique", 
+                     values_from = growthHabit, values_fill = NA)  
+  
+
+NPNDuration <- USDAplantsNPNdata1 %>% 
+  dplyr::select(-growthHabit) %>% 
+  tidyr::pivot_wider(names_from = duration, names_repair = "unique", 
+                     values_from = duration, values_fill = NA)
+  
+
+save(NPNGrowth, NPNDuration, file = "NPNGrowth&Duration.RData")
+
+#join the above two
+NPNDurationGrowth <- dplyr::left_join(NPNDuration, NPNGrowth)
+
+save(NPNDurationGrowth, file = "NPNGrowthDuration.RData")
+
+
+# #join the above two
+# NPNGrowthDuration <- NPNDuration %>% dplyr::select(-"observationId", -"datasetId", -"updateDatetime", -"siteName", 
+#                                                    -"latitude", -"longitude", -"elevationInMeters", -"state", "speciesId",
+#                                                    -"genusName", -"speciesEpithet", -"commonName", -"kingdom", -"speciesFunctionalType",
+#                                                    -"speciesCategory", -"phenophaseId", -"phenophaseCategory", -"phenophaseDescription",
+#                                                    -"phenophaseName", -"observationDate", -"dayOfYear", -"phenophaseStatus",
+#                                                    -"intensityCategoryId", -"intensityValue", -"abundanceValue", -"gdd", -"gddf",
+#                                                    -"tmaxWinter", -"tmaxSpring", -"tmaxSummer", -"tmaxFall", -"tmax", -"tmaxf", 
+#                                                    -"tminWinter", -"tminSpring", -"tminSummer", -"tminFall", -"tmin", - "tminf", 
+#                                                    -"prcpWinter", -"prcpSpring", -"prcpSummer", -"prcpFall", -"prcp", -"accPrcp"
+#                                                    -"daylength", -"invasive", -"year", -"smpName", -"Perennial", -"Biennial", -"Annual") %>% 
+#   left_join(NPNGrowth)
+
+NPNGrowth2 <- USDAplantsNPNdata2 %>% 
+  dplyr::select(-duration) %>% 
+  tidyr::pivot_wider(names_from = growthHabit, names_repair = "unique", 
+                     values_from = growthHabit, values_fill = NA)
+
+NPNDuration2 <- USDAplantsNPNdata2 %>% 
+  dplyr::select(-growthHabit) %>% 
+  tidyr::pivot_wider(names_from = duration, names_repair = "unique", 
+                     values_from = duration, values_fill = NA)
+
+save(NPNGrowth2, file = "NPNGrowth2.RData")
+save(NPNDuration2, file = "NPNDuration2.RData")
+
+NPNDurationGrowth2 <- dplyr::left_join(NPNDuration2, NPNGrowth2)
+
+save(NPNDurationGrowth2, file = "NPNDurationGrowth2.RData")
+
+readr::write_csv(x = NPNDurationGrowth2, file = "NPNDurationGrowthSymbol.csv", append = FALSE, col_names = T)
+
+
+readr::write_csv(x = NPNDurationGrowth, file = "NPNDurationGrowthSymbol&ScName.csv", append = FALSE, col_names = T)
+readr::write_csv(x = NPNDurationGrowth2, file = "NPNDurationGrowthSymbol.csv", append = FALSE, col_names = T)
+
+# reading the csv files from YX
+NofRecords_bySppEcor1 <-  read_csv(file = "NofRecords_bySppEcor1.csv", col_names = T, trim_ws = T, skip = 0, n_max = Inf, name_repair = "unique", )
+NofRecords_bySppYearEcor2 <-  read_csv(file = "NofRecords_bySppYearEcor2.csv", col_names = T, trim_ws = T, skip = 0, n_max = Inf, name_repair = "unique", )
+NofRecords_bySppYear <-  read_csv(file = "NofRecords_bySppYear.csv", col_names = T, trim_ws = T, skip = 0, n_max = Inf, name_repair = "unique", )
+NofRecords_total_bySpp <-  read_csv(file = "NofRecords_total_bySpp.csv", col_names = T, trim_ws = T, skip = 0, n_max = Inf, name_repair = "unique", )
+NofRecords_bySppYearEcor1 <-  read_csv(file = "NofRecords_bySppYearEcor1.csv", col_names = T, trim_ws = T, skip = 0, n_max = Inf, name_repair = "unique", )
+
+save(NofRecords_bySppEcor1, NofRecords_bySppYearEcor2, NofRecords_bySppYear, NofRecords_total_bySpp, NofRecords_bySppYearEcor1, 
+     file = "byYrSppEcor.RData")
+
+# filter thew two ecoregions of interest
+NofRecords_bySppYearEcor1_fiveEight <- NofRecords_bySppYearEcor1 %>% 
+  filter(NA_L1CODE == 5 | NA_L1CODE == 8) %>% 
+  filter(!str_detect(string = sciName, pattern = " spp.$") ) %>% 
+  group_by(year, NA_L1CODE) %>% 
+  arrange(NA_L1CODE, year, desc(n_ecor1)) 
+
+NofRecords_bySppYearEcor2_fiveEight <- NofRecords_bySppYearEcor2 %>% 
+  filter(NA_L2CODE == 5.2 | NA_L2CODE == 5.3 | NA_L2CODE == 8.1 | NA_L2CODE == 8.2 |NA_L2CODE == 8.3 |NA_L2CODE == 8.4 |NA_L2CODE == 8.5  ) %>% 
+  filter(!str_detect(string = sciName, pattern = " spp.$") ) %>% 
+  group_by(year, NA_L2CODE) %>% 
+  arrange(NA_L2CODE, year, desc(n_ecor2)) 
+
+save(NofRecords_bySppYearEcor1_fiveEight, NofRecords_bySppYearEcor2_fiveEight, file = "NofRecords_bySppYearEcor5&8.RData")
+
+# all NPN species
+NofRecords_bySppYearEcor1_fiveEight %>% 
+  distinct(sciName) %>% view()
+
+# looking into NEON data to get nativity status and taxonomic details
+plantsTaxTab = getTaxonList( taxonType = "PLANT", recordReturnLimit = NA, stream = "true", verbose = "false")
+
+# neon data from all plants have native status, but taxon table does not 
+NEONplants = neonUtilities::loadByProduct( dpID = "DP1.10058.001", site = "all", package = "expanded", release = "current", timeIndex = "all",
+                              tabl = "all", check.size = F,nCores = 1, forceParallel = T)
+
+list2env(NEONplants, globalenv())
+
+save(NEONplants, file = "NEONplants.RData")
+save(plantsTaxTab, file = "plantsTaxTab.RData")
+save(div_10m2Data100m2Data, div_1m2Data, file = "neonPlantDiv.RData")
+
+# creating a species list
+neonPlantList1 = div_10m2Data100m2Data %>% dplyr::select(domainID, siteID, scientificName, taxonRank, family, nativeStatusCode) %>% 
+  distinct() %>% 
+  filter(taxonRank %in% "species" | taxonRank %in%  "speciesGroup"   | taxonRank %in%  "subspecies"  | taxonRank %in%  "variety"   ) %>% 
+  mutate(sciNameBinomial = word(string = scientificName, start = 1, end = 2, sep = fixed(" "))) # just return the genus and species epithet 
+  
+neonPlantList2 = div_1m2Data %>% dplyr::select(domainID, siteID, scientificName, taxonRank, family, nativeStatusCode) %>% 
+  distinct() %>% 
+  filter(taxonRank %in% "species" | taxonRank %in%  "speciesGroup"   | taxonRank %in%  "subspecies"  | taxonRank %in%  "variety"   ) %>% 
+  mutate(sciNameBinomial = word(string = scientificName, start = 1, end = 2, sep = fixed(" "))) # just return the genus and species epithet 
+
+# this list IDs nativity at site level
+neonPlantListSite = bind_rows(neonPlantList1, neonPlantList2) %>%  dplyr::select(-scientificName) %>% 
+  distinct(domainID, siteID, family, nativeStatusCode, sciNameBinomial) %>%  # dropped taxonRank as different ranks may have the same/different nativity status
+  filter(!str_detect(string = sciNameBinomial, pattern = " spp.$") ) # remove spp. names
+
+
+# it might be better to just jeep nativity to domain level
+neonPlantListDomain = neonPlantListSite %>% dplyr::select(-siteID) %>% 
+  distinct(domainID, family, nativeStatusCode, sciNameBinomial)  # dropped taxonRank as different ranks may have the same/different nativity status
+  
+  
+# nativity just at species level regardless of the geography 
+neonPlantList = neonPlantListDomain %>% dplyr::select(-domainID) %>% 
+  distinct(family, nativeStatusCode, sciNameBinomial) # dropped taxonRank as different ranks may have the same/different nativity status
+
+save(neonPlantList, neonPlantListDomain, neonPlantListSite, file = "neonPlantList.RData")
+
+# some plants may be native in some parts of the US, but not so in another part of the US
+# so, better to join NPN data with the domain list. 
+nOfRec_bySppYrEcor1Nativity = NofRecords_bySppYearEcor1_fiveEight %>% ungroup() %>% 
+left_join(neonPlantListDomain, by = c("sciName" = "sciNameBinomial"), 
+                                               na_matches = "na", # Should two NA or two NaN values match? "na", the default, treats two NA or two NaN values as equal
+                                               multiple = "all" , # Handling of rows in x with multiple matches in y. For each row of x: "all" returns every match detected in y. 
+                                               keep = F) # 	Should the join keys from both x and y be preserved in the output? If FALSE, only keys from x are retained
+save(nOfRec_bySppYrEcor1Nativity, file = "nOfRec_bySppYrEcor1Nativity.RData")
+
+# filter out the records where the nativity status is NA
+bySppYrEcor1Nativity_NA = nOfRec_bySppYrEcor1Nativity %>% filter( is.na(nativeStatusCode )) %>% 
+  dplyr::select(-year, -NA_L1CODE, -n_ecor1, -domainID) %>% 
+  distinct()
+
+# written into an xlsx for editing/filling in the native status  
+writexl::write_xlsx(bySppYrEcor1Nativity_NA, path = "bySppYrEcor1Nativity_NAuneited.xlsx") #keep this as a backup
+writexl::write_xlsx(bySppYrEcor1Nativity_NA, path = "bySppYrEcor1Nativity_NA.xlsx")
+
+# read the edted sheet into R
+bySppYrEcor1Nativity_NAEdit =  readxl::read_excel(path = "bySppYrEcor1Nativity_NA.xlsx", sheet = "Sheet1", col_names = T, na = "", trim_ws = T)
+
+
+# npn records with nativity status and family missing with the year and ecoregion info
+bySppYrEcor1Nativity_NA2 = nOfRec_bySppYrEcor1Nativity %>% filter( is.na(nativeStatusCode )) %>% 
+  dplyr::select(-n_ecor1, -domainID) %>% 
+  distinct()
+
+# join the edited list with the missing data list
+bySppYrEcor1Nativity_NAEdit2 = bySppYrEcor1Nativity_NA2 %>% dplyr::select(sciName, year, NA_L1CODE) %>% 
+  left_join(bySppYrEcor1Nativity_NAEdit, by = "sciName",  keep = NULL)
+
+# bind the rows of  
+nOfRec_bySppYrEcor1Nativity2 = nOfRec_bySppYrEcor1Nativity %>% filter(!is.na(nativeStatusCode )) %>% 
+  bind_rows(bySppYrEcor1Nativity_NAEdit2)
+
+save(nOfRec_bySppYrEcor1Nativity2, file = "nOfRec_bySppYrEcor1Nativity2.RData")
+
+write_xlsx(x =  nOfRec_bySppYrEcor1Nativity2, path = "nOfRec_bySppYrEcor1Nativity2.xlsx" )
+
+# make a general species list with nativity status regardless of the year and the domain
+nativityList = nOfRec_bySppYrEcor1Nativity2 %>% dplyr::select(-year, -NA_L1CODE, -n_ecor1, -domainID) %>% distinct()
+
+save(nativityList, file = "nativityList.RData")
+
+write_xlsx(nativityList, path = "nativityList.xlsx")
+
+# join the nativity list to level 2 ecoregion data
+nOfRec_bySppYrEcor2Nativity2 = NofRecords_bySppYearEcor2_fiveEight %>% left_join(nativityList, by = "sciName",  keep = F, multiple = "all")
+
+save(nOfRec_bySppYrEcor2Nativity2, file = "nOfRec_bySppYrEcor2Nativity2.RData")
+
+write_xlsx(x =  nOfRec_bySppYrEcor2Nativity2, path = "nOfRec_bySppYrEcor2Nativity2.xlsx" )
+
+
+# making pivot tables
+bySppYrecoreg1 <- PivotTable$new() # create an empty table
+
+bySppYrecoreg1$addData(nOfRec_bySppYrEcor1Nativity2) # add data to the pvt table
+
+bySppYrecoreg1$addColumnDataGroups("NA_L1CODE") # add col groups 
+
+bySppYrecoreg1$addColumnDataGroups("year")
+
+bySppYrecoreg1$addRowDataGroups("nativeStatusCode")
+
+bySppYrecoreg1$addRowDataGroups("sciName") # add rows
+
+bySppYrecoreg1$defineCalculation( calculationName = "nRecrods", summariseExpression = "sum(n_ecor1)" )
+
+bySppYrecoreg1$evaluatePivot()
+
+save(bySppYrecoreg1, file = "bySppYrecoreg1.RData")
+
+# bySppYrecoreg1
+# bySppYrecoreg1$renderPivot()
+
+# save to excel
+wbBySppYrecoreg <- createWorkbook(creator = Sys.getenv("USERNAME"))
+addWorksheet(wb = wbBySppYrecoreg, sheetName = "BySppYrecoregL1" , gridLines = T)
+bySppYrecoreg1$writeToExcelWorksheet(wb=wbBySppYrecoreg, wsName="BySppYrecoregL1", 
+                         topRowNumber=2, leftMostColumnNumber=2, applyStyles=TRUE)
+saveWorkbook(wb = wbBySppYrecoreg, file="npnInvNativSppYrecoreg.xlsx", overwrite = TRUE, returnValue = T)
+
+
+
+
+
+
