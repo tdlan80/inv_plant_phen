@@ -56,4 +56,41 @@ write_csv(sp_site_all, file = "C:/Users/xiey2/Documents/Research/Projects/EREN B
 # read combined data
 sp_site_all= read_csv(file = "C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_spp_sites_all.csv")
 
-table(sp_site_all$growthHabit, useNA="always")
+
+
+# read data with family and native status from NEON
+sp_neon=read_csv(file="C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/nOfRec_bySppYrEcor1Nativity2_1.csv")
+
+
+# combine family name and native status, and remove invasive column
+sp_site_all1=left_join(sp_site_all[, -13], sp_neon[, c(1, 6:7)]) %>% distinct()
+
+sp_site_all1=sp_site_all1[, c(1:5, 19, 6:8, 11:12, 9:10, 20, 13:18)]
+colnames(sp_site_all1)[6]="familyName"
+
+summary(sp_site_all1)
+
+write_csv(sp_site_all1, file = "C:/Users/xiey2/Documents/Research/Projects/EREN Biodiversity/NPNdata/plantsNPN_spp_sites_all_20230802.csv")
+
+
+table(sp_site_all1$nativeStatusCode, useNA = "always")
+#     A     I     N    NI  <NA> 
+#   141  4017 24373   630   542 
+
+table(sp_site_all1$growthHabit, useNA="always")
+# Forb/herb     Shrub  Subshrub      Tree      Vine      <NA> 
+#   5376      7265       854     14794       323      1091 
+
+table(sp_site_all1$speciesFunctionalType, useNA="always")
+# Algae                      Cactus         Deciduous broadleaf           Deciduous conifer 
+#    9                          10                       20508                         238 
+# Drought deciduous broadleaf         Evergreen broadleaf           Evergreen conifer              Evergreen forb 
+#                         75                        1222                         576                          36 
+# Forb                   Graminoid                        Pine    Semi-evergreen broadleaf 
+# 5823                         313                         586                         291 
+# Semi-evergreen forb                        <NA> 
+#                 16                           0 
+
+sp_site_all1 %>% filter(is.na(growthHabit)) %>% view()
+
+sp_site_all1 %>% filter(is.na(nativeStatusCode)) %>% view()
